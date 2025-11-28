@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+env/
+venv/
+.env
+
+# Jupyter
+.ipynb_checkpoints
+
+# Data / DB
+*.db
+*.db.bak
+*.sqlite3
+*.sqlite
+
+# IDE / OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Outputs
+*.png
+*.pdf
+*.xlsx
