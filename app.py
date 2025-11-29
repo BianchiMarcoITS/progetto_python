@@ -1,14 +1,151 @@
 import streamlit as st
 import pandas as pd
-
-import streamlit as st
-import pandas as pd
+from io import BytesIO
 
 from modules.data_loader import load_csv
 from modules.analyzer import apply_filters, compute_statistics
 from modules.plotter import generate_plot
 
 from database import init_db, save_dataset, list_datasets, load_dataset, save_history
+
+
+# ======================================================
+# FUNZIONI DI EXPORT
+# ======================================================
+def export_to_pdf_chart(fig, filename):
+    """Esporta un grafico matplotlib in PDF."""
+    try:
+        buf = BytesIO()
+        fig.savefig(buf, format='pdf', bbox_inches='tight')
+        buf.seek(0)
+        return buf.getvalue()
+    except Exception as e:
+        st.error(f"Errore nell'export PDF: {e}")
+        return None
+
+
+def export_to_excel(df, filename):
+    """Esporta un DataFrame in Excel (.xlsx)."""
+    try:
+        from openpyxl.utils import get_column_letter
+        buf = BytesIO()
+        with pd.ExcelWriter(buf, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Data', index=False)
+            # Formattazione basilare: autowidth delle colonne
+            worksheet = writer.sheets['Data']
+            for idx, col in enumerate(df.columns, 1):
+                max_length = max(df[col].astype(str).apply(len).max(), len(col)) + 2
+                col_letter = get_column_letter(idx)
+                worksheet.column_dimensions[col_letter].width = min(max_length, 50)
+        buf.seek(0)
+        return buf.getvalue()
+    except Exception as e:
+        st.error(f"Errore nell'export Excel: {e}")
+        return None
+
+
+def export_pdf_report(df, fig, title, filename):
+    """Esporta un report PDF strutturato con tabella + grafico usando reportlab."""
+    try:
+        from reportlab.lib.pagesizes import A4, landscape
+        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+        from reportlab.lib.units import inch
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
+        from reportlab.lib import colors
+        from datetime import datetime
+        
+        # Salva il grafico in PNG per includerlo nel PDF
+        img_buf = BytesIO()
+        fig.savefig(img_buf, format='png', bbox_inches='tight', dpi=100)
+        img_buf.seek(0)
+        
+        # Crea PDF su landscape per grafici larghi
+        pdf_buf = BytesIO()
+        doc = SimpleDocTemplate(pdf_buf, pagesize=landscape(A4), topMargin=0.4*inch, bottomMargin=0.4*inch, leftMargin=0.4*inch, rightMargin=0.4*inch)
+        
+        # Stili
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=16,
+            textColor=colors.HexColor('#1f77b4'),
+            spaceAfter=8,
+            alignment=1  # centrato
+        )
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=8,
+            spaceAfter=4
+        )
+        
+        # Contenuto del report
+        story = []
+        
+        # Titolo e timestamp
+        story.append(Paragraph(title, title_style))
+        story.append(Paragraph(f"<b>Generato il:</b> {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}", normal_style))
+        story.append(Spacer(1, 0.15*inch))
+        
+        # Tabella dati (con scroll orizzontale se molte colonne)
+        story.append(Paragraph("<b>Dati</b>", styles['Heading2']))
+        
+        # Converti DataFrame in lista per la tabella
+        data = [list(df.columns)] + df.values.tolist()
+        
+        # Limita il numero di righe per leggibilità (max 15 + header su landscape)
+        if len(data) > 16:
+            data_display = data[:16]
+            story.append(Paragraph(f"<i>(Visualizzati 15 record su {len(df)} totali)</i>", normal_style))
+        else:
+            data_display = data
+        
+        # Crea tabella con colonne ridimensionate dinamicamente
+        n_cols = len(df.columns)
+        # Massima larghezza disponibile su landscape A4: ~10 inches
+        max_width = 10 * inch
+        col_widths = [max_width / max(1, n_cols)] * n_cols
+        
+        table = Table(data_display, colWidths=col_widths)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1f77b4')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 9),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 6),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.grey),
+            ('FONTSIZE', (0, 1), (-1, -1), 7),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey]),
+            ('TOPPADDING', (0, 1), (-1, -1), 2),
+            ('BOTTOMPADDING', (0, 1), (-1, -1), 2),
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Grafico
+        story.append(Paragraph("<b>Grafico</b>", styles['Heading2']))
+        
+        # Ridimensiona l'immagine per adattarla bene al landscape
+        # Larghezza: quasi tutta la pagina, altezza proporzionale
+        img_width = 9.5 * inch
+        img_height = 4.5 * inch
+        img = Image(img_buf, width=img_width, height=img_height)
+        story.append(img)
+        
+        # Build PDF
+        doc.build(story)
+        pdf_buf.seek(0)
+        return pdf_buf.getvalue()
+    
+    except Exception as e:
+        st.error(f"Errore nell'export PDF report: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
 
 
 # ======================================================
@@ -155,7 +292,13 @@ if df is not None:
                                 filename_base = 'aggregated'
                                 if upload_file is not None and hasattr(upload_file, 'name'):
                                     filename_base = upload_file.name.replace('.csv', '')
-                                st.download_button(label="Download CSV (aggregato)", data=csv_bytes, file_name=f"{filename_base}_aggregated.csv", mime="text/csv")
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.download_button(label="Download CSV (aggregato)", data=csv_bytes, file_name=f"{filename_base}_aggregated.csv", mime="text/csv")
+                                with col2:
+                                    excel_data = export_to_excel(agg_df, f"{filename_base}_aggregated.xlsx")
+                                    if excel_data:
+                                        st.download_button(label="Download Excel (aggregato)", data=excel_data, file_name=f"{filename_base}_aggregated.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
                             except Exception:
                                 pass
 
@@ -165,6 +308,30 @@ if df is not None:
                             fig = generate_plot(agg_df, [group_col] + value_cols, chart_type)
                             if fig:
                                 st.pyplot(fig)
+                                # Export grafico aggregato
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    try:
+                                        buf = BytesIO()
+                                        fig.savefig(buf, format='png', bbox_inches='tight')
+                                        buf.seek(0)
+                                        st.download_button(label='Download grafico PNG (aggregato)', data=buf.getvalue(), file_name=f"{filename_base}_aggregated_{chart_type}.png", mime='image/png')
+                                    except Exception:
+                                        pass
+                                with col2:
+                                    try:
+                                        pdf_data = export_to_pdf_chart(fig, f"{filename_base}_aggregated_{chart_type}.pdf")
+                                        if pdf_data:
+                                            st.download_button(label='Download grafico PDF (aggregato)', data=pdf_data, file_name=f"{filename_base}_aggregated_{chart_type}.pdf", mime='application/pdf')
+                                    except Exception:
+                                        pass
+                                with col3:
+                                    try:
+                                        report_data = export_pdf_report(agg_df, fig, f"Report Aggregato: {chart_type}", f"{filename_base}_report_aggregated_{chart_type}.pdf")
+                                        if report_data:
+                                            st.download_button(label='Download Report PDF (aggregato)', data=report_data, file_name=f"{filename_base}_report_aggregated_{chart_type}.pdf", mime='application/pdf')
+                                    except Exception:
+                                        pass
                         except Exception as e:
                             st.error(f"Errore durante l'aggregazione rapida: {e}")
 
@@ -193,12 +360,26 @@ if df is not None:
             filename_base = 'dataset'
 
         if csv_bytes is not None and not filtered_df.empty:
-            st.download_button(
-                label="Download CSV (filtrato)",
-                data=csv_bytes,
-                file_name=f"{filename_base}_filtered.csv",
-                mime="text/csv"
-            )
+            col1, col2 = st.columns(2)
+            with col1:
+                st.download_button(
+                    label="Download CSV (filtrato)",
+                    data=csv_bytes,
+                    file_name=f"{filename_base}_filtered.csv",
+                    mime="text/csv"
+                )
+            with col2:
+                try:
+                    excel_data = export_to_excel(filtered_df, f"{filename_base}_filtered.xlsx")
+                    if excel_data:
+                        st.download_button(
+                            label="Download Excel (filtrato)",
+                            data=excel_data,
+                            file_name=f"{filename_base}_filtered.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                except Exception:
+                    st.info('Impossibile esportare come Excel.')
         else:
             st.button("Download CSV (filtrato)", disabled=True)
 
@@ -229,7 +410,7 @@ if df is not None:
 
         chart_type = st.selectbox(
             "Tipo di grafico:",
-            ["Barre", "Linee", "Istogramma"]
+            ["Barre", "Linee", "Istogramma", "Torta"]
         )
 
         fig = generate_plot(filtered_df, selected_cols, chart_type)
@@ -237,18 +418,45 @@ if df is not None:
         if fig:
             st.pyplot(fig)
             # --- Export grafico ---
-            try:
-                from io import BytesIO
-                buf = BytesIO()
-                fig.savefig(buf, format='png', bbox_inches='tight')
-                buf.seek(0)
-                st.download_button(
-                    label='Download grafico PNG',
-                    data=buf.getvalue(),
-                    file_name=f"{filename_base}_{chart_type}.png",
-                    mime='image/png'
-                )
-            except Exception:
-                st.info('Impossibile esportare il grafico come PNG.')
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                try:
+                    buf = BytesIO()
+                    fig.savefig(buf, format='png', bbox_inches='tight')
+                    buf.seek(0)
+                    st.download_button(
+                        label='Download grafico PNG',
+                        data=buf.getvalue(),
+                        file_name=f"{filename_base}_{chart_type}.png",
+                        mime='image/png'
+                    )
+                except Exception:
+                    st.info('Impossibile esportare il grafico come PNG.')
+            
+            with col2:
+                try:
+                    pdf_data = export_to_pdf_chart(fig, f"{filename_base}_{chart_type}.pdf")
+                    if pdf_data:
+                        st.download_button(
+                            label='Download grafico PDF',
+                            data=pdf_data,
+                            file_name=f"{filename_base}_{chart_type}.pdf",
+                            mime='application/pdf'
+                        )
+                except Exception:
+                    st.info('Impossibile esportare il grafico come PDF.')
+            
+            with col3:
+                try:
+                    report_data = export_pdf_report(filtered_df, fig, f"Report: {chart_type}", f"{filename_base}_report_{chart_type}.pdf")
+                    if report_data:
+                        st.download_button(
+                            label='Download Report PDF',
+                            data=report_data,
+                            file_name=f"{filename_base}_report_{chart_type}.pdf",
+                            mime='application/pdf'
+                        )
+                except Exception:
+                    st.info('Impossibile esportare il report PDF.')
         else:
             st.warning("Impossibile generare un grafico con i dati selezionati.")

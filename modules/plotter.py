@@ -134,6 +134,32 @@ def generate_plot(df: pd.DataFrame, columns: list, chart_type: str, top_n: int =
         plt.tight_layout()
         return fig
 
+    if chart_type == "Torta":
+        # Per grafico a torta, sommiamo i valori numerici
+        try:
+            if len(numeric_cols) == 1:
+                # Una sola colonna: torta dei valori sommati per indice (se categorico)
+                data_sum = df[numeric_cols[0]].sum()
+                fig, ax = plt.subplots(figsize=(8, 8))
+                ax.pie([data_sum], labels=[numeric_cols[0]], autopct='%1.1f%%', startangle=90)
+                ax.set_title(f"Torta: {numeric_cols[0]}")
+                plt.tight_layout()
+                return fig
+            else:
+                # Più colonne: somma per colonna e mostra come torta
+                sums = df[numeric_cols].sum()
+                # Filtra solo i valori positivi
+                sums = sums[sums > 0]
+                if len(sums) == 0:
+                    return None
+                fig, ax = plt.subplots(figsize=(8, 8))
+                ax.pie(sums.values, labels=sums.index, autopct='%1.1f%%', startangle=90)
+                ax.set_title("Torta: Somma per Colonna")
+                plt.tight_layout()
+                return fig
+        except Exception:
+            pass
+
     fig, ax = plt.subplots(figsize=(10, 5))
     plt.style.use("ggplot")
 
