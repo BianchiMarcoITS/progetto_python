@@ -120,6 +120,54 @@ if df is not None:
         st.write("### Risultato filtrato:")
         st.dataframe(filtered_df)
 
+        # --- Aggregazione rapida (opzionale) ---
+        # Se tra le colonne selezionate ci sono categoriche, offriamo
+        # una semplice UI per raggruppare il risultato filtrato.
+        cat_selected = [c for c in selected_cols if not pd.api.types.is_numeric_dtype(df[c])]
+        num_all = [c for c in df.columns.tolist() if pd.api.types.is_numeric_dtype(df[c])]
+        if cat_selected:
+            st.subheader("Aggregazione rapida (opzionale)")
+            # chiave unica per evitare StreamlitDuplicateElementId
+            cat_key = "_".join([c.replace(' ', '_') for c in cat_selected])[:200]
+            group_col = st.selectbox("Raggruppa per (colonna categorica)", ["-- Nessuna --"] + cat_selected, key=f"group_col_{cat_key}")
+            if group_col and group_col != "-- Nessuna --":
+                # Permetti di scegliere colonne numeriche da aggregare (dalla tabella completa)
+                value_cols = st.multiselect("Colonne numeriche da aggregare", num_all, default=(num_all[:1] if num_all else []), key=f"vals_{cat_key}")
+                agg_op = st.selectbox("Operazione di aggregazione", ["sum", "mean", "count", "max", "min"], key=f"aggop_{cat_key}") 
+
+                if value_cols:
+                        try:
+                            if agg_op == "count":
+                                agg_df = filtered_df.groupby(group_col)[value_cols].count().reset_index()
+                            else:
+                                agg_df = filtered_df.groupby(group_col)[value_cols].agg(agg_op).reset_index()
+
+                            # Ordina per la prima colonna di valore (discendente)
+                            sort_by = value_cols[0]
+                            agg_df = agg_df.sort_values(by=sort_by, ascending=False)
+
+                            st.write("### Tabella aggregata")
+                            st.dataframe(agg_df)
+
+                            # Export CSV
+                            try:
+                                csv_bytes = agg_df.to_csv(index=False).encode('utf-8')
+                                filename_base = 'aggregated'
+                                if upload_file is not None and hasattr(upload_file, 'name'):
+                                    filename_base = upload_file.name.replace('.csv', '')
+                                st.download_button(label="Download CSV (aggregato)", data=csv_bytes, file_name=f"{filename_base}_aggregated.csv", mime="text/csv")
+                            except Exception:
+                                pass
+
+                            # Grafico della tabella aggregata
+                            st.subheader("Grafico aggregato")
+                            chart_type = st.selectbox("Tipo di grafico:", ["Barre", "Linee", "Torta"], key=f"agg_chart_{group_col}")
+                            fig = generate_plot(agg_df, [group_col] + value_cols, chart_type)
+                            if fig:
+                                st.pyplot(fig)
+                        except Exception as e:
+                            st.error(f"Errore durante l'aggregazione rapida: {e}")
+
         # --- Export dei dati filtrati ---
         csv_bytes = None
         try:
