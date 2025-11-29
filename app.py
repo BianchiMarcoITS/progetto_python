@@ -13,7 +13,15 @@ from database import init_db, save_dataset, list_datasets, load_dataset, save_hi
 # FUNZIONI DI EXPORT
 # ======================================================
 def export_to_pdf_chart(fig, filename):
-    """Esporta un grafico matplotlib in PDF."""
+    """Esporta un grafico Matplotlib in formato PDF.
+
+    Args:
+        fig (matplotlib.figure.Figure): Figura Matplotlib da esportare.
+        filename (str): Nome file suggerito (usato solo per metadata/nomi di download).
+
+    Returns:
+        bytes | None: Contenuto PDF in byte se l'operazione ha successo, altrimenti ``None``.
+    """
     try:
         buf = BytesIO()
         fig.savefig(buf, format='pdf', bbox_inches='tight')
@@ -25,7 +33,17 @@ def export_to_pdf_chart(fig, filename):
 
 
 def export_to_excel(df, filename):
-    """Esporta un DataFrame in Excel (.xlsx)."""
+    """Esporta un ``pandas.DataFrame`` in un file Excel (.xlsx).
+
+    Effettua una formattazione di base (larghezza colonne) usando ``openpyxl``.
+
+    Args:
+        df (pandas.DataFrame): DataFrame da esportare.
+        filename (str): Nome file suggerito (usato solo per metadata/nomi di download).
+
+    Returns:
+        bytes | None: Conteuto del file .xlsx in memoria se ha successo, altrimenti ``None``.
+    """
     try:
         from openpyxl.utils import get_column_letter
         buf = BytesIO()
@@ -45,7 +63,20 @@ def export_to_excel(df, filename):
 
 
 def export_pdf_report(df, fig, title, filename):
-    """Esporta un report PDF strutturato con tabella + grafico usando reportlab."""
+    """Crea ed esporta un report PDF con tabella dati e grafico.
+
+    Usa ``reportlab`` per assemblare un PDF in landscape contenente una
+    tabella (preview limitata delle righe) e il grafico fornito come immagine.
+
+    Args:
+        df (pandas.DataFrame): DataFrame di cui includere la tabella.
+        fig (matplotlib.figure.Figure): Figura Matplotlib da includere nel report.
+        title (str): Titolo del report.
+        filename (str): Nome file suggerito (usato solo per metadata/nomi di download).
+
+    Returns:
+        bytes | None: Contenuto PDF se l'operazione ha successo, altrimenti ``None``.
+    """
     try:
         from reportlab.lib.pagesizes import A4, landscape
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle

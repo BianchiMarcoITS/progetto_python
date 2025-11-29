@@ -8,9 +8,16 @@ import pandas as pd
 
 
 def apply_filters(df: pd.DataFrame, columns: list, filters: list):
-    """
-    Applica una lista di filtri al DataFrame.
-    filters = [(col, operatore, valore)]
+    """Applica una serie di filtri al DataFrame.
+
+    Args:
+        df (pandas.DataFrame): DataFrame sorgente.
+        columns (list): Colonne coinvolte (non sempre usate direttamente da questa funzione).
+        filters (list): Lista di tuple ``(col, operatore, valore)`` dove
+            ``operatore`` può essere ``'between'`` o ``'in'``.
+
+    Returns:
+        pandas.DataFrame: DataFrame filtrato.
     """
     filtered = df.copy()
 
@@ -26,8 +33,16 @@ def apply_filters(df: pd.DataFrame, columns: list, filters: list):
 
 
 def compute_statistics(df: pd.DataFrame, columns: list, operation: str):
-    """
-    Calcola statistiche sulla base dell'operazione scelta.
+    """Calcola statistiche semplici sulle colonne selezionate.
+
+    Args:
+        df (pandas.DataFrame): DataFrame sorgente (di solito già filtrato).
+        columns (list): Colonne su cui calcolare le statistiche.
+        operation (str): Una delle operazioni supportate: ``'Media'``, ``'Somma'``,
+            ``'Conteggio'``, ``'Massimo'``, ``'Minimo'``.
+
+    Returns:
+        dict: Mappa colonna → valore calcolato (tipo numerico o int per i conteggi).
     """
     results = {}
 

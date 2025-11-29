@@ -1,7 +1,3 @@
-"""
-database.py - versione con path assoluti sicuri
-"""
-
 import sqlite3
 import pandas as pd
 import pickle
@@ -14,7 +10,15 @@ DB_PATH = os.path.join(BASE_DIR, "csv_analyzer.db")
 
 
 def init_db():
-    """Crea le tabelle se non esistono."""
+    """Crea le tabelle del database se non esistono.
+
+    Questo metodo inizializza il file SQLite nella cartella del progetto
+    creando le tabelle `datasets` e `history` se non presenti. Scrive
+    anche un log semplice in `db_init.log` per tracciare le invocazioni.
+
+    Returns:
+        None
+    """
     print(f"[DB] Inizializzo database in: {DB_PATH}")
     print(f"[DB] BASE_DIR: {BASE_DIR}")
     print(f"[DB] File esiste? {os.path.exists(DB_PATH)}")
@@ -146,6 +150,15 @@ def save_dataset(name: str, df: pd.DataFrame):
 
 
 def load_dataset(dataset_id: int):
+    """Carica e deserializza un dataset memorizzato nel DB.
+
+    Args:
+        dataset_id (int): ID del dataset da caricare.
+
+    Returns:
+        pandas.DataFrame | None: DataFrame deserializzato se trovato,
+            altrimenti ``None`` se l'ID non esiste.
+    """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
@@ -158,6 +171,12 @@ def load_dataset(dataset_id: int):
 
 
 def list_datasets():
+    """Restituisce la lista dei dataset salvati.
+
+    Returns:
+        list[tuple]: Lista di tuple ``(id, name, upload_date)`` per i dataset
+            presenti nel DB.
+    """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
@@ -169,6 +188,16 @@ def list_datasets():
 
 
 def save_history(dataset_id: int, columns: list, operation: str):
+    """Registra un'operazione eseguita su un dataset nella tabella `history`.
+
+    Args:
+        dataset_id (int): ID del dataset coinvolto.
+        columns (list): Lista di colonne coinvolte nell'operazione.
+        operation (str): Descrizione breve dell'operazione (es. 'filter', 'aggregate').
+
+    Returns:
+        None
+    """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
@@ -184,6 +213,12 @@ def save_history(dataset_id: int, columns: list, operation: str):
 
 
 def load_history():
+    """Recupera la cronologia delle operazioni eseguite su dataset.
+
+    Returns:
+        list[tuple]: Lista di righe con (history.id, dataset.name, columns, operation, timestamp),
+            ordinate per timestamp decrescente.
+    """
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 

@@ -9,8 +9,23 @@ from matplotlib.ticker import ScalarFormatter
 import pandas as pd
 
 def generate_plot(df: pd.DataFrame, columns: list, chart_type: str, top_n: int = 20, max_xticks: int = 20, force_horizontal: bool = False):
-    """
-    Genera un grafico matplotlib basato sui dati filtrati.
+    """Genera e ritorna una figura Matplotlib basata sui dati forniti.
+
+    Questa funzione è flessibile: per colonne non numeriche crea grafici di
+    conteggio (bar, barh, stacked), per colonne numeriche crea barre/linee/istogrammi
+    e supporta anche la visualizzazione a torta quando sensato.
+
+    Args:
+        df (pandas.DataFrame): DataFrame filtrato con i dati da visualizzare.
+        columns (list): Lista di colonne da includere nel grafico.
+        chart_type (str): Tipo di grafico: ``'Barre'``, ``'Linee'``, ``'Istogramma'``, ``'Torta'``.
+        top_n (int, optional): Numero massimo di categorie da mostrare per i conteggi. Default 20.
+        max_xticks (int, optional): Numero massimo di tick sull'asse X prima di ridurli. Default 20.
+        force_horizontal (bool, optional): Forza l'uso di barre orizzontali quando True. Default False.
+
+    Returns:
+        matplotlib.figure.Figure | None: Oggetto figura se il grafico è stato generato,
+            altrimenti ``None`` se i dati non sono adatti.
     """
     def _format_y(ax):
         try:
